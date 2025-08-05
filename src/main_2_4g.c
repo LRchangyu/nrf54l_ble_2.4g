@@ -688,6 +688,7 @@ int main_2_4g(void)
 			}
 
 			// 切换到下一个信道
+			current_channel_index+=2; // 跳过2个信道
 			radio_hop_to_next_channel();
 			// printf("RX scanning channel %d (freq: %d MHz)\n", 
 			    //    current_channel_index, 2400 + hop_channels[current_channel_index]);
