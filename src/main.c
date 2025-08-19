@@ -23,7 +23,7 @@ typedef enum{
 } mode_e;
 
 static mode_e current_mode = MODE_BLE;
-
+static uint8_t ble_id = 0;
 void button_changed(uint32_t button_state, uint32_t has_changed)
 {
 	uint32_t buttons = button_state & has_changed;
@@ -43,6 +43,12 @@ void button_changed(uint32_t button_state, uint32_t has_changed)
 		if(current_mode == MODE_2_4G) {
 			NRF_POWER->GPREGRET[1] = 0xffffffff;
 			NVIC_SystemReset();
+		}else{
+			ble_id++;
+			if(ble_id >= CONFIG_BT_ID_MAX) {
+				ble_id = 0;
+			}
+			usr_ble_id_set(ble_id);
 		}
 		return;
 	}

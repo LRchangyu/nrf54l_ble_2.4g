@@ -110,6 +110,161 @@ K_MSGQ_DEFINE(mitm_queue,
 	      CONFIG_BT_HIDS_MAX_CLIENT_COUNT,
 	      4);
 
+//===========================================================================
+static void advertising_start(void);
+static uint8_t current_id = 0;
+static struct k_work id_change_work;
+static bool is_id_changing = false;
+K_MSGQ_DEFINE(id_queue,
+	      sizeof(uint8_t),
+	      4,
+	      4);
+
+int usr_ble_id_set(uint8_t id)
+{
+	int err;
+
+	if (id >= CONFIG_BT_ID_MAX) {
+		printk("Invalid ID (id %d)\n", id);
+		return -EINVAL;
+	}
+
+	if(id == current_id){
+		printk("ID is already set (id %d)\n", id);
+		return 0;
+	}
+
+	err = k_msgq_put(&id_queue, &id, K_NO_WAIT);
+	if (err) {
+		printk("Failed to add ID to queue (err %d)\n", err);
+		return err;
+	}
+
+	printk("k_work_submit id_change_work:%d\n", id);
+	k_work_submit(&id_change_work);
+	return 0;
+}
+
+static void id_change_handler(struct k_work *work)
+{
+	uint8_t id;
+	int err;
+	k_msgq_get(&id_queue, &id, K_NO_WAIT);
+	if (id >= CONFIG_BT_ID_MAX) {
+		return;
+	}
+
+	is_id_changing = true;
+	if (conn_mode[0].conn) {
+		printk("Disconnecting from current connection (id %d)\n", current_id);
+		bt_conn_disconnect(conn_mode[0].conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+		k_sleep(K_MSEC(500));//wait disconnect.This can be done with a better way. 
+		
+	}
+
+	if(is_adv_running){
+		err = bt_le_adv_stop();
+		if (err) {
+			printk("Advertising failed to stop (err %d)\n", err);
+		}
+	}
+	
+
+	is_adv_running = false;
+	current_id = id;
+	is_id_changing = false;
+	printk("ID changed to %d\n", current_id);
+	advertising_start();
+
+}
+
+static void mac_init(void){
+	size_t count;
+	int ret;
+	bt_addr_le_t mac0;
+
+	bt_addr_le_t mac1;
+
+	bt_addr_le_t mac2;
+
+	bt_id_get(NULL, &count);
+	printk("MAC address count: %d\n", count);
+
+	mac0.type = BT_ADDR_LE_RANDOM;
+	mac0.a.val[0] = 0XF0;
+	mac0.a.val[1] = 0x34;
+	mac0.a.val[2] = 0x56;
+	mac0.a.val[3] = 0x78;
+	mac0.a.val[4] = 0x9A;
+	mac0.a.val[5] = 0XC0;
+
+	mac1.type = BT_ADDR_LE_RANDOM;
+	mac1.a.val[0] = 0XF1;
+	mac1.a.val[1] = 0x34;
+	mac1.a.val[2] = 0x56;
+	mac1.a.val[3] = 0x78;
+	mac1.a.val[4] = 0x9A;
+	mac1.a.val[5] = 0XC1;
+
+	mac2.type = BT_ADDR_LE_RANDOM;
+	mac2.a.val[0] = 0XF2;
+	mac2.a.val[1] = 0x34;
+	mac2.a.val[2] = 0x56;
+	mac2.a.val[3] = 0x78;
+	mac2.a.val[4] = 0x9A;
+	mac2.a.val[5] = 0XC2;
+
+	ret = bt_id_create(&mac0,NULL);
+	bt_id_get(NULL, &count);
+	printk("mac cr ret:%d,MAC address count: %d\n", ret,count);
+	printk("mac addr 0: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac0.a.val[0], mac0.a.val[1],
+		mac0.a.val[2], mac0.a.val[3],
+		mac0.a.val[4], mac0.a.val[5]);
+	printk("mac addr 1: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac1.a.val[0], mac1.a.val[1],
+		mac1.a.val[2], mac1.a.val[3],
+		mac1.a.val[4], mac1.a.val[5]);
+	printk("mac addr 2: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac2.a.val[0], mac2.a.val[1],
+		mac2.a.val[2], mac2.a.val[3],
+		mac2.a.val[4], mac2.a.val[5]);
+
+	ret = bt_id_create(&mac1,NULL);
+	bt_id_get(NULL, &count);
+	printk("mac cr ret:%d,MAC address count: %d\n", ret,count);
+	printk("mac addr 0: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac0.a.val[0], mac0.a.val[1],
+		mac0.a.val[2], mac0.a.val[3],
+		mac0.a.val[4], mac0.a.val[5]);
+	printk("mac addr 1: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac1.a.val[0], mac1.a.val[1],
+		mac1.a.val[2], mac1.a.val[3],
+		mac1.a.val[4], mac1.a.val[5]);
+	printk("mac addr 2: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac2.a.val[0], mac2.a.val[1],
+		mac2.a.val[2], mac2.a.val[3],
+		mac2.a.val[4], mac2.a.val[5]);
+
+	bt_id_create(&mac2,NULL);
+	bt_id_get(NULL, &count);
+	printk("mac cr ret:%d,MAC address count: %d\n", ret,count);
+	printk("mac addr 0: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac0.a.val[0], mac0.a.val[1],
+		mac0.a.val[2], mac0.a.val[3],
+		mac0.a.val[4], mac0.a.val[5]);
+	printk("mac addr 1: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac1.a.val[0], mac1.a.val[1],
+		mac1.a.val[2], mac1.a.val[3],
+		mac1.a.val[4], mac1.a.val[5]);
+	printk("mac addr 2: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		mac2.a.val[0], mac2.a.val[1],
+		mac2.a.val[2], mac2.a.val[3],
+		mac2.a.val[4], mac2.a.val[5]);
+	k_sleep(K_SECONDS(1));
+
+}
+
 #if CONFIG_BT_DIRECTED_ADVERTISING
 static void bond_find(const struct bt_bond_info *info, void *user_data)
 {
@@ -138,6 +293,7 @@ static void advertising_continue(void)
 {
 	struct bt_le_adv_param adv_param;
 
+	memset(&adv_param, 0, sizeof(adv_param));
 #if CONFIG_BT_DIRECTED_ADVERTISING
 	bt_addr_le_t addr;
 
@@ -154,7 +310,11 @@ static void advertising_continue(void)
 			is_adv_running = false;
 		}
 
-		adv_param = *BT_LE_ADV_CONN_DIR(&addr);
+		adv_param.id = current_id;
+		adv_param.options = BT_LE_ADV_OPT_CONN;
+		adv_param.peer = &addr;
+		adv_param.interval_min = 0;
+		adv_param.interval_max = 0;
 		adv_param.options |= BT_LE_ADV_OPT_DIR_ADDR_RPA;
 
 		err = bt_le_adv_start(&adv_param, NULL, 0, NULL, 0);
@@ -176,6 +336,13 @@ static void advertising_continue(void)
 		}
 
 		adv_param = *BT_LE_ADV_CONN_FAST_2;
+
+		adv_param.id = current_id;
+		adv_param.options = BT_LE_ADV_OPT_CONN;
+		adv_param.peer = NULL;
+		adv_param.interval_min = BT_GAP_ADV_FAST_INT_MIN_2;
+		adv_param.interval_max = BT_GAP_ADV_FAST_INT_MAX_2;
+
 		err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad),
 				  sd, ARRAY_SIZE(sd));
 		if (err) {
@@ -193,7 +360,7 @@ static void advertising_start(void)
 {
 #if CONFIG_BT_DIRECTED_ADVERTISING
 	k_msgq_purge(&bonds_queue);
-	bt_foreach_bond(BT_ID_DEFAULT, bond_find, NULL);
+	bt_foreach_bond(current_id, bond_find, NULL);
 #endif
 
 	k_work_submit(&adv_work);
@@ -314,7 +481,8 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 		}
 	}
 
-	advertising_start();
+	if(!is_id_changing)
+		advertising_start();
 }
 
 
@@ -790,6 +958,7 @@ int main_ble(void)
 	/* DIS initialized at system boot with SYS_INIT macro. */
 	hid_init();
 
+	mac_init();
 	err = bt_enable(NULL);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
@@ -797,7 +966,7 @@ int main_ble(void)
 	}
 
 	printk("Bluetooth initialized\n");
-
+	k_work_init(&id_change_work, id_change_handler);
 	k_work_init(&hids_work, mouse_handler);
 	k_work_init(&adv_work, advertising_process);
 	if (IS_ENABLED(CONFIG_BT_HIDS_SECURITY_ENABLED)) {

@@ -26,9 +26,11 @@
 /* Id of reference to Mouse Input Report containing media player data. */
 #define INPUT_REP_REF_MPLAYER_ID    3
 
+int usr_ble_id_set(uint8_t id);
 void button_handler_ble(uint32_t button_state, uint32_t has_changed);
-void button_handler_2_4g(uint32_t button_state, uint32_t has_changed);
 int main_ble(void);
+
+void button_handler_2_4g(uint32_t button_state, uint32_t has_changed);
 int main_2_4g(void);
 
 #endif /* MAIN_H */
