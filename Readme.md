@@ -56,6 +56,8 @@ static void mac_init(void)
 NCS 3.x.x 之后，开关广播、扫描、连接等操作，需要使用 work 或者线程等异步操作，不能像以前的版本那么随意调用
 
 ### 绑定后的定向广播
+
+```
 static void advertising_start(void)
 {
 #if CONFIG_BT_DIRECTED_ADVERTISING
@@ -65,4 +67,6 @@ static void advertising_start(void)
 
 	k_work_submit(&adv_work);
 }
+```
+
 根据 current_id ，从对应的绑定信息中获取主机的 MAC ，进行定向广播。
